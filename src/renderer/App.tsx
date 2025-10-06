@@ -55,7 +55,7 @@ const App = () => {
         try {
             const result = await window.electronAPI.showOpenDialog({
                 filters: [
-                    { name: 'Video Files', extensions: ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv', 'm4v'] }
+                    { name: 'Video Files', extensions: ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv', 'm4v', 'hevc', 'h265'] }
                 ]
             });
             if (result.success && result.filePath) {
@@ -73,27 +73,45 @@ const App = () => {
     const handleStartConversion = useCallback(async (settings: VideoSettingsConfig) => {
         if (!selectedVideo) return;
         
-        setConversionStatus('processing');
-        setIsProcessing(true);
-        setConversionProgress(null);
-        
+        // Ask for save location first
         try {
+            const result = await window.electronAPI.showSaveDialog(
+                selectedVideo.name.replace(/\.[^/.]+$/, '') + '_converted.mp4'
+            );
+            
+            if (result.canceled || !result.filePath) {
+                return; // User canceled save dialog
+            }
+            
+            const finalOutputPath = result.filePath;
+            setSavedFilePath(finalOutputPath);
+            setSavedFileName(finalOutputPath.split('/').pop() || 'converted.mp4');
+            
+            setConversionStatus('processing');
+            setIsProcessing(true);
+            setConversionProgress(null);
+            
             const tempDir = await window.electronAPI.getTempDir();
             const inputPath = `${tempDir}/${selectedVideo.name}`;
-            const outputPath = `${tempDir}/${selectedVideo.name.replace(/\.[^/.]+$/, '')}_converted.mp4`;
+            const tempOutputPath = `${tempDir}/${selectedVideo.name.replace(/\.[^/.]+$/, '')}_converted.mp4`;
             
             const convertedPath = await VideoService.convertToMp4(
                 inputPath,
-                outputPath,
+                tempOutputPath,
+                settings,
                 (progress) => {
                     setConversionProgress(progress);
                 }
             );
             
-            const stats = await window.electronAPI.getFileStats(convertedPath);
+            // Copy to final location
+            await window.electronAPI.copyFile(convertedPath, finalOutputPath);
+            
+            const stats = await window.electronAPI.getFileStats(finalOutputPath);
             setConvertedFileSize(stats.size);
-            setConvertedVideoPath(convertedPath);
+            setConvertedVideoPath(finalOutputPath);
             setConversionStatus('completed');
+            setShowSuccessModal(true);
         } catch (error) {
             console.error('Conversion error:', error);
             setErrorMessage(error instanceof Error ? error.message : 'Conversion failed');
@@ -197,8 +215,8 @@ const App = () => {
             <Separator /> 
             {selectedVideo || conversionStatus !== 'idle' ? (
                 <div className='flex flex-col h-[calc(100vh-100px)]'>
-                    <div className='flex flex-col lg:flex-row items-center justify-center gap-8 w-full flex-1 px-6 py-8'>
-                        <div className="w-full lg:w-1/3 max-w-sm">
+                    <div className='flex flex-col lg:flex-row items-start justify-center gap-8 w-full flex-1 px-6 py-8'>
+                        <div className="w-full lg:w-1/3 max-w-sm h-[500px]">
                             <VideoUpload
                                 onVideoSelect={handleVideoSelect}
                                 isProcessing={isProcessing}
@@ -207,7 +225,7 @@ const App = () => {
                             />
                         </div>
                         
-                        <div className="w-full lg:w-1/3 max-w-sm">
+                        <div className="w-full lg:w-1/3 max-w-sm h-[500px]">
                             <VideoProcessor
                                 isProcessing={isProcessing}
                                 progress={conversionProgress}
@@ -219,7 +237,7 @@ const App = () => {
                             />
                         </div>
                         
-                        <div className="w-full lg:w-1/3 max-w-sm">
+                        <div className="w-full lg:w-1/3 max-w-sm h-[500px]">
                             <VideoPreview
                                 convertedVideoPath={convertedVideoPath}
                                 isConverting={conversionStatus === 'processing'}

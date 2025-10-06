@@ -69,11 +69,10 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({
 
                 {isConverting && (
                     <div className="flex-1 flex flex-col items-center justify-center text-center">
-                        <ReloadIcon className="w-12 h-12 animate-spin text-blue-500 mb-4" />
-                        <p className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                            Processing...
-                        </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <PlayIcon className="w-8 h-8 text-gray-400" />
+                        </div>
+                        <p className="text-gray-500 dark:text-gray-400">
                             Your video preview will be ready soon
                         </p>
                     </div>

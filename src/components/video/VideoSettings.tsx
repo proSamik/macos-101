@@ -15,11 +15,13 @@ export interface VideoSettingsConfig {
     socialMediaOptimization: boolean;
     platform: 'instagram' | 'twitter' | 'youtube' | 'facebook' | 'general';
     enableHardwareAcceleration: boolean;
+    maxFileSizeMB: number;
 }
 
 interface VideoSettingsProps {
     config: VideoSettingsConfig;
     onConfigChange: (config: VideoSettingsConfig) => void;
+    onStartConversion?: (config: VideoSettingsConfig) => void;
     disabled?: boolean;
 }
 
@@ -44,7 +46,8 @@ const VideoSettings: React.FC<VideoSettingsProps> = ({
             preset: 'medium',
             socialMediaOptimization: false,
             platform: 'general',
-            enableHardwareAcceleration: true
+            enableHardwareAcceleration: true,
+            maxFileSizeMB: 50
         };
         setLocalConfig(defaultConfig);
     };
@@ -223,6 +226,30 @@ const VideoSettings: React.FC<VideoSettingsProps> = ({
                                 enableHardwareAcceleration: checked
                             })}
                         />
+                    </div>
+
+                    <Separator />
+
+                    {/* File Size Constraint */}
+                    <div className="space-y-3">
+                        <Label className="text-base font-medium">
+                            Max File Size: {localConfig.maxFileSizeMB} MB
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                            Automatically adjust settings to stay under this file size limit
+                        </p>
+                        <Slider
+                            value={[localConfig.maxFileSizeMB]}
+                            onValueChange={([value]) => setLocalConfig({...localConfig, maxFileSizeMB: value})}
+                            max={500}
+                            min={10}
+                            step={5}
+                            className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>10 MB (Highly compressed)</span>
+                            <span>500 MB (No constraint)</span>
+                        </div>
                     </div>
                 </div>
 

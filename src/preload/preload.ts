@@ -23,6 +23,7 @@ export interface VideoSettingsConfig {
   socialMediaOptimization: boolean;
   platform: 'instagram' | 'twitter' | 'youtube' | 'facebook' | 'general';
   enableHardwareAcceleration: boolean;
+  maxFileSizeMB: number;
 }
 
 export interface ElectronAPI {
@@ -37,8 +38,8 @@ export interface ElectronAPI {
   getFileStats: (filePath: string) => Promise<{ size: number; isFile: boolean }>;
   extractFirstFrame: (filePath: string, outputDir: string) => Promise<{ success: boolean; thumbnailPath?: string; error?: string }>;
   getVideoMetadata: (filePath: string) => Promise<{ success: boolean; metadata?: VideoMetadata; error?: string }>;
-  convertVideo: (inputPath: string, outputPath: string, conversionId: string) => Promise<{ success: boolean; convertedPath?: string; error?: string }>;
-  optimizeForSocialMedia: (inputPath: string, outputPath: string, platform: string, conversionId: string) => Promise<{ success: boolean; convertedPath?: string; error?: string }>;
+  convertVideo: (inputPath: string, outputPath: string, settings: VideoSettingsConfig, conversionId: string) => Promise<{ success: boolean; convertedPath?: string; error?: string }>;
+  optimizeForSocialMedia: (inputPath: string, outputPath: string, settings: VideoSettingsConfig, conversionId: string) => Promise<{ success: boolean; convertedPath?: string; error?: string }>;
   onConversionProgress: (callback: (conversionId: string, progress: VideoConversionProgress) => void) => void;
   removeConversionProgressListener: (callback: (conversionId: string, progress: VideoConversionProgress) => void) => void;
 }
@@ -55,8 +56,8 @@ const electronAPI: ElectronAPI = {
   getFileStats: (filePath: string) => ipcRenderer.invoke('get-file-stats', filePath),
   extractFirstFrame: (filePath: string, outputDir: string) => ipcRenderer.invoke('extract-first-frame', filePath, outputDir),
   getVideoMetadata: (filePath: string) => ipcRenderer.invoke('get-video-metadata', filePath),
-  convertVideo: (inputPath: string, outputPath: string, conversionId: string) => ipcRenderer.invoke('convert-video', inputPath, outputPath, conversionId),
-  optimizeForSocialMedia: (inputPath: string, outputPath: string, platform: string, conversionId: string) => ipcRenderer.invoke('optimize-for-social-media', inputPath, outputPath, platform, conversionId),
+  convertVideo: (inputPath: string, outputPath: string, settings: VideoSettingsConfig, conversionId: string) => ipcRenderer.invoke('convert-video', inputPath, outputPath, settings, conversionId),
+  optimizeForSocialMedia: (inputPath: string, outputPath: string, settings: VideoSettingsConfig, conversionId: string) => ipcRenderer.invoke('optimize-for-social-media', inputPath, outputPath, settings, conversionId),
   onConversionProgress: (callback: (conversionId: string, progress: VideoConversionProgress) => void) => {
     ipcRenderer.on('conversion-progress', (_, conversionId, progress) => callback(conversionId, progress));
   },

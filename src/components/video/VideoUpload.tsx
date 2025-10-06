@@ -21,7 +21,7 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
         try {
             const result = await window.electronAPI.showOpenDialog({
                 filters: [
-                    { name: 'Video Files', extensions: ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv', 'm4v'] }
+                    { name: 'Video Files', extensions: ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv', 'm4v', 'hevc', 'h265'] }
                 ]
             });
             

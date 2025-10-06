@@ -1,4 +1,4 @@
-import { VideoConversionProgress, VideoMetadata } from '../preload/preload';
+import { VideoConversionProgress, VideoMetadata, VideoSettingsConfig } from '../preload/preload';
 
 export class VideoService {
     static async getVideoMetadata(filePath: string): Promise<VideoMetadata> {
@@ -20,6 +20,7 @@ export class VideoService {
     static async convertToMp4(
         inputPath: string,
         outputPath: string,
+        settings: VideoSettingsConfig,
         onProgress: (progress: VideoConversionProgress) => void
     ): Promise<string> {
         const conversionId = `conversion-${Date.now()}-${Math.random()}`;
@@ -34,7 +35,7 @@ export class VideoService {
         window.electronAPI.onConversionProgress(progressCallback);
         
         try {
-            const result = await window.electronAPI.convertVideo(inputPath, outputPath, conversionId);
+            const result = await window.electronAPI.convertVideo(inputPath, outputPath, settings, conversionId);
             if (result.success && result.convertedPath) {
                 return result.convertedPath;
             }
@@ -47,7 +48,7 @@ export class VideoService {
     static async optimizeForSocialMedia(
         inputPath: string,
         outputPath: string,
-        platform: 'instagram' | 'twitter' | 'youtube' | 'facebook',
+        settings: VideoSettingsConfig,
         onProgress: (progress: VideoConversionProgress) => void
     ): Promise<string> {
         const conversionId = `social-conversion-${Date.now()}-${Math.random()}`;
@@ -62,7 +63,7 @@ export class VideoService {
         window.electronAPI.onConversionProgress(progressCallback);
         
         try {
-            const result = await window.electronAPI.optimizeForSocialMedia(inputPath, outputPath, platform, conversionId);
+            const result = await window.electronAPI.optimizeForSocialMedia(inputPath, outputPath, settings, conversionId);
             if (result.success && result.convertedPath) {
                 return result.convertedPath;
             }

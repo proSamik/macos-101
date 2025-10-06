@@ -31,19 +31,36 @@ const VideoProcessor: React.FC<VideoProcessorProps> = ({
         preset: 'medium',
         socialMediaOptimization: false,
         platform: 'general',
-        enableHardwareAcceleration: true
+        enableHardwareAcceleration: true,
+        maxFileSizeMB: 50
     });
     const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<string>('');
+    const [startTime, setStartTime] = useState<number | null>(null);
 
     useEffect(() => {
-        if (progress && progress.progress > 0) {
-            const elapsed = new Date().getTime();
-            const estimated = (elapsed * (100 - progress.progress)) / progress.progress;
-            const minutes = Math.floor(estimated / 60000);
-            const seconds = Math.floor((estimated % 60000) / 1000);
-            setEstimatedTimeRemaining(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+        if (conversionStatus === 'processing' && startTime === null) {
+            setStartTime(Date.now());
+        } else if (conversionStatus !== 'processing') {
+            setStartTime(null);
+            setEstimatedTimeRemaining('');
         }
-    }, [progress]);
+    }, [conversionStatus, startTime]);
+
+    useEffect(() => {
+        if (progress && progress.progress > 0 && startTime) {
+            const elapsed = Date.now() - startTime;
+            const estimated = (elapsed * (100 - progress.progress)) / progress.progress;
+            const totalSeconds = Math.floor(estimated / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            
+            if (minutes > 0) {
+                setEstimatedTimeRemaining(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+            } else {
+                setEstimatedTimeRemaining(`${seconds}s`);
+            }
+        }
+    }, [progress, startTime]);
 
     const formatFileSize = (bytes: number) => {
         const sizes = ['Bytes', 'KB', 'MB', 'GB'];
@@ -183,9 +200,16 @@ const VideoProcessor: React.FC<VideoProcessorProps> = ({
                         <p className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                             Conversion Complete!
                         </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                             Your video has been successfully converted to MP4
                         </p>
+                        
+                        <div className="flex justify-center">
+                            <VideoSettings
+                                config={videoSettings}
+                                onConfigChange={setVideoSettings}
+                            />
+                        </div>
                     </div>
                 )}
 

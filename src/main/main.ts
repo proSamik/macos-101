@@ -3,7 +3,7 @@ import { autoUpdater } from 'electron-updater';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import { VideoProcessor, VideoConversionProgress } from './videoProcessor';
+import { VideoProcessor, VideoConversionProgress, VideoSettingsConfig } from './videoProcessor';
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
@@ -259,7 +259,7 @@ ipcMain.handle('get-video-metadata', async (_, filePath: string) => {
 // Store active conversions to handle progress updates
 const activeConversions = new Map<string, BrowserWindow>();
 
-ipcMain.handle('convert-video', async (event, inputPath: string, outputPath: string, conversionId: string) => {
+ipcMain.handle('convert-video', async (event, inputPath: string, outputPath: string, settings: VideoSettingsConfig, conversionId: string) => {
   try {
     const senderWindow = BrowserWindow.fromWebContents(event.sender);
     if (senderWindow) {
@@ -269,6 +269,7 @@ ipcMain.handle('convert-video', async (event, inputPath: string, outputPath: str
     const convertedPath = await VideoProcessor.convertToMp4(
       inputPath,
       outputPath,
+      settings,
       (progress: VideoConversionProgress) => {
         const window = activeConversions.get(conversionId);
         if (window && !window.isDestroyed()) {
@@ -290,7 +291,7 @@ ipcMain.handle('optimize-for-social-media', async (
   event, 
   inputPath: string, 
   outputPath: string, 
-  platform: 'instagram' | 'twitter' | 'youtube' | 'facebook',
+  settings: VideoSettingsConfig,
   conversionId: string
 ) => {
   try {
@@ -302,7 +303,7 @@ ipcMain.handle('optimize-for-social-media', async (
     const convertedPath = await VideoProcessor.optimizeForSocialMedia(
       inputPath,
       outputPath,
-      platform,
+      settings,
       (progress: VideoConversionProgress) => {
         const window = activeConversions.get(conversionId);
         if (window && !window.isDestroyed()) {

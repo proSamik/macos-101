@@ -54,8 +54,8 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
         </h2>
 
         {/* Description */}
-        <p className="text-sm text-gray-600 text-center mb-8">
-          {fileName ? `"${fileName}" has been saved successfully.` : 'Your image has been saved successfully.'}
+        <p className="text-sm text-gray-600 text-center mb-8 break-words">
+          {fileName ? `"${fileName}" has been saved successfully.` : 'Your video has been saved successfully.'}
         </p>
 
         {/* Buttons */}
