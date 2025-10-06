@@ -28,10 +28,13 @@ interface VideoSettingsProps {
 const VideoSettings: React.FC<VideoSettingsProps> = ({
     config,
     onConfigChange,
+    onStartConversion,
     disabled = false
 }) => {
     const [localConfig, setLocalConfig] = useState<VideoSettingsConfig>(config);
     const [isOpen, setIsOpen] = useState(false);
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [useMaxFileSize, setUseMaxFileSize] = useState(false);
 
     const handleSave = () => {
         onConfigChange(localConfig);
@@ -86,89 +89,40 @@ const VideoSettings: React.FC<VideoSettingsProps> = ({
                 </DialogHeader>
                 
                 <div className="space-y-6 py-4">
-                    {/* Quality Preset */}
+                    {/* Max File Size Option */}
                     <div className="space-y-3">
-                        <Label className="text-base font-medium">Quality Preset</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {Object.entries(qualitySettings).map(([key, setting]) => (
-                                <Button
-                                    key={key}
-                                    variant={localConfig.quality === key ? 'default' : 'outline'}
-                                    className="flex flex-col items-start p-3 h-auto"
-                                    onClick={() => setLocalConfig({
-                                        ...localConfig,
-                                        quality: key as any,
-                                        bitrate: setting.bitrate
-                                    })}
-                                >
-                                    <span className="font-medium capitalize">{key}</span>
-                                    <span className="text-xs text-muted-foreground">{setting.description}</span>
-                                </Button>
-                            ))}
+                        <div className="flex items-center justify-between">
+                            <Label className="text-base font-medium">Max File Size</Label>
+                            <Switch
+                                checked={useMaxFileSize}
+                                onCheckedChange={(checked) => setUseMaxFileSize(checked)}
+                            />
                         </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* Resolution */}
-                    <div className="space-y-3">
-                        <Label className="text-base font-medium">Output Resolution</Label>
-                        <div className="grid grid-cols-4 gap-2">
-                            {['720p', '1080p', '1440p', '4k'].map((res) => (
-                                <Button
-                                    key={res}
-                                    variant={localConfig.resolution === res ? 'default' : 'outline'}
-                                    onClick={() => setLocalConfig({...localConfig, resolution: res as any})}
-                                >
-                                    {res}
-                                </Button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Custom Bitrate */}
-                    <div className="space-y-3">
-                        <Label className="text-base font-medium">
-                            Bitrate: {localConfig.bitrate} kbps
-                        </Label>
-                        <Slider
-                            value={[localConfig.bitrate]}
-                            onValueChange={([value]) => setLocalConfig({...localConfig, bitrate: value})}
-                            max={15000}
-                            min={1000}
-                            step={500}
-                            className="w-full"
-                        />
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>1000 kbps (Low)</span>
-                            <span>15000 kbps (Ultra)</span>
-                        </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* Encoding Preset */}
-                    <div className="space-y-3">
-                        <Label className="text-base font-medium">Encoding Speed</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {[
-                                { key: 'ultrafast', label: 'Ultra Fast', desc: 'Quick but larger files' },
-                                { key: 'fast', label: 'Fast', desc: 'Good balance' },
-                                { key: 'medium', label: 'Medium', desc: 'Recommended' },
-                                { key: 'slow', label: 'Slow', desc: 'Better compression' },
-                                { key: 'veryslow', label: 'Very Slow', desc: 'Best compression' }
-                            ].map((preset) => (
-                                <Button
-                                    key={preset.key}
-                                    variant={localConfig.preset === preset.key ? 'default' : 'outline'}
-                                    className="flex flex-col items-center p-3 h-auto text-xs"
-                                    onClick={() => setLocalConfig({...localConfig, preset: preset.key as any})}
-                                >
-                                    <span className="font-medium text-sm">{preset.label}</span>
-                                    <span className="text-xs text-muted-foreground text-center">{preset.desc}</span>
-                                </Button>
-                            ))}
-                        </div>
+                        
+                        {useMaxFileSize && (
+                            <>
+                                <p className="text-sm text-muted-foreground">
+                                    Automatically optimize settings to stay under this file size limit
+                                </p>
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium">
+                                        Target Size: {localConfig.maxFileSizeMB} MB
+                                    </Label>
+                                    <Slider
+                                        value={[localConfig.maxFileSizeMB]}
+                                        onValueChange={([value]) => setLocalConfig({...localConfig, maxFileSizeMB: value})}
+                                        max={500}
+                                        min={10}
+                                        step={5}
+                                        className="w-full"
+                                    />
+                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                        <span>10 MB</span>
+                                        <span>500 MB</span>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     <Separator />
@@ -178,15 +132,16 @@ const VideoSettings: React.FC<VideoSettingsProps> = ({
                         <div className="flex items-center justify-between">
                             <Label className="text-base font-medium">Social Media Optimization</Label>
                             <Switch
-                                checked={localConfig.socialMediaOptimization}
+                                checked={localConfig.socialMediaOptimization && !useMaxFileSize}
                                 onCheckedChange={(checked) => setLocalConfig({
                                     ...localConfig,
                                     socialMediaOptimization: checked
                                 })}
+                                disabled={useMaxFileSize}
                             />
                         </div>
                         
-                        {localConfig.socialMediaOptimization && (
+                        {localConfig.socialMediaOptimization && !useMaxFileSize && (
                             <div className="space-y-2">
                                 <Label className="text-sm">Platform</Label>
                                 <div className="grid grid-cols-2 gap-2">
@@ -213,58 +168,129 @@ const VideoSettings: React.FC<VideoSettingsProps> = ({
 
                     <Separator />
 
-                    {/* Hardware Acceleration */}
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <Label className="text-base font-medium">Hardware Acceleration</Label>
-                            <p className="text-sm text-muted-foreground">Use GPU acceleration when available</p>
-                        </div>
-                        <Switch
-                            checked={localConfig.enableHardwareAcceleration}
-                            onCheckedChange={(checked) => setLocalConfig({
-                                ...localConfig,
-                                enableHardwareAcceleration: checked
-                            })}
-                        />
-                    </div>
-
-                    <Separator />
-
-                    {/* File Size Constraint */}
+                    {/* Advanced Settings */}
                     <div className="space-y-3">
-                        <Label className="text-base font-medium">
-                            Max File Size: {localConfig.maxFileSizeMB} MB
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                            Automatically adjust settings to stay under this file size limit
-                        </p>
-                        <Slider
-                            value={[localConfig.maxFileSizeMB]}
-                            onValueChange={([value]) => setLocalConfig({...localConfig, maxFileSizeMB: value})}
-                            max={500}
-                            min={10}
-                            step={5}
-                            className="w-full"
-                        />
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>10 MB (Highly compressed)</span>
-                            <span>500 MB (No constraint)</span>
-                        </div>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setShowAdvanced(!showAdvanced)}
+                            className="w-full justify-between"
+                            disabled={useMaxFileSize}
+                        >
+                            <span>Advanced Settings</span>
+                            <svg 
+                                className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
+                                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </Button>
+                        
+                        {showAdvanced && !useMaxFileSize && (
+                            <div className="space-y-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                                {/* Quality Preset */}
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium">Quality Preset</Label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {Object.entries(qualitySettings).map(([key, setting]) => (
+                                            <Button
+                                                key={key}
+                                                variant={localConfig.quality === key ? 'default' : 'outline'}
+                                                className="flex flex-col items-start p-2 h-auto text-xs"
+                                                onClick={() => setLocalConfig({
+                                                    ...localConfig,
+                                                    quality: key as any,
+                                                    bitrate: setting.bitrate
+                                                })}
+                                            >
+                                                <span className="font-medium capitalize">{key}</span>
+                                                <span className="text-xs text-muted-foreground">{setting.description}</span>
+                                            </Button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Resolution */}
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium">Output Resolution</Label>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {['720p', '1080p', '1440p', '4k'].map((res) => (
+                                            <Button
+                                                key={res}
+                                                variant={localConfig.resolution === res ? 'default' : 'outline'}
+                                                size="sm"
+                                                onClick={() => setLocalConfig({...localConfig, resolution: res as any})}
+                                            >
+                                                {res}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Encoding Speed */}
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium">Encoding Speed</Label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {[
+                                            { key: 'ultrafast', label: 'Ultra Fast' },
+                                            { key: 'fast', label: 'Fast' },
+                                            { key: 'medium', label: 'Medium' },
+                                            { key: 'slow', label: 'Slow' },
+                                            { key: 'veryslow', label: 'Very Slow' }
+                                        ].map((preset) => (
+                                            <Button
+                                                key={preset.key}
+                                                variant={localConfig.preset === preset.key ? 'default' : 'outline'}
+                                                size="sm"
+                                                onClick={() => setLocalConfig({...localConfig, preset: preset.key as any})}
+                                            >
+                                                {preset.label}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Hardware Acceleration */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <Label className="text-sm font-medium">Hardware Acceleration</Label>
+                                        <p className="text-xs text-muted-foreground">Use GPU when available</p>
+                                    </div>
+                                    <Switch
+                                        checked={localConfig.enableHardwareAcceleration}
+                                        onCheckedChange={(checked) => setLocalConfig({
+                                            ...localConfig,
+                                            enableHardwareAcceleration: checked
+                                        })}
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                <div className="flex justify-between pt-4">
-                    <Button variant="outline" onClick={handleReset}>
+                <div className="flex justify-center gap-3 pt-6">
+                    <Button variant="outline" onClick={handleReset} className="min-w-[120px]">
                         Reset to Default
                     </Button>
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => setIsOpen(false)}>
-                            Cancel
-                        </Button>
-                        <Button onClick={handleSave}>
-                            Apply Settings
-                        </Button>
-                    </div>
+                    <Button variant="outline" onClick={() => setIsOpen(false)} className="min-w-[120px]">
+                        Cancel
+                    </Button>
+                    <Button 
+                        onClick={() => {
+                            onConfigChange(localConfig);
+                            setIsOpen(false);
+                            if (onStartConversion) {
+                                onStartConversion(localConfig);
+                            }
+                        }}
+                        className="min-w-[120px]"
+                        style={{
+                            background: 'linear-gradient(135deg, #153592 0%, #26c9d5 100%)',
+                            backgroundSize: '200% 200%'
+                        }}
+                    >
+                        Next
+                    </Button>
                 </div>
             </DialogContent>
         </Dialog>

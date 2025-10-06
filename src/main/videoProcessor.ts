@@ -219,6 +219,11 @@ export class VideoProcessor {
 
                 let command = ffmpeg(inputPath);
                 
+                // Add HEVC/H.265 input codec detection
+                if (inputPath.toLowerCase().includes('.hevc') || inputPath.toLowerCase().includes('.h265')) {
+                    command = command.inputOptions(['-c:v hevc']);
+                }
+                
                 if (settings.enableHardwareAcceleration) {
                     command = command.inputOptions(['-hwaccel auto']);
                 }

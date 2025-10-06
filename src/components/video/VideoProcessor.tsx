@@ -111,6 +111,7 @@ const VideoProcessor: React.FC<VideoProcessorProps> = ({
                                     <VideoSettings
                                         config={videoSettings}
                                         onConfigChange={setVideoSettings}
+                                        onStartConversion={onStartConversion}
                                     />
                                 </div>
                             </div>
@@ -241,6 +242,7 @@ const VideoProcessor: React.FC<VideoProcessorProps> = ({
                                     <VideoSettings
                                         config={videoSettings}
                                         onConfigChange={setVideoSettings}
+                                        onStartConversion={onStartConversion}
                                     />
                                 </div>
                             </div>
