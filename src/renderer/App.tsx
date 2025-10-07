@@ -33,6 +33,7 @@ const App = () => {
         setThumbnailUrl(null);
         setConvertedVideoPath(null);
         setCurrentVideoPath(''); // Clear old path immediately
+        currentVideoPathRef.current = ''; // Clear ref immediately too
         setIsProcessing(true);
         
         try {
@@ -86,8 +87,10 @@ const App = () => {
     };
 
     const handleStartConversion = useCallback(async (settings: VideoSettingsConfig) => {
-        if (!selectedVideo || !currentVideoPath) {
+        if (!selectedVideo || !currentVideoPathRef.current) {
             console.error('No video selected or currentVideoPath is empty');
+            console.log('currentVideoPath state:', currentVideoPath);
+            console.log('currentVideoPathRef.current:', currentVideoPathRef.current);
             return;
         }
         
