@@ -103,14 +103,17 @@ export class VideoProcessor {
 
     static async extractFirstFrame(filePath: string, outputDir: string): Promise<string> {
         return new Promise((resolve, reject) => {
-            const outputPath = path.join(outputDir, 'thumbnail.png');
+            // Use timestamp to ensure unique thumbnail filename
+            const timestamp = Date.now();
+            const thumbnailFilename = `thumbnail_${timestamp}.png`;
+            const outputPath = path.join(outputDir, thumbnailFilename);
             
             ffmpeg(filePath)
                 .screenshots({
                     timestamps: ['00:00:02.000'],
-                    filename: 'thumbnail.png',
+                    filename: thumbnailFilename,
                     folder: outputDir,
-                    size: '320x240'
+                    size: '320x?'  // Maintain aspect ratio, max width 320px
                 })
                 .on('end', () => {
                     resolve(outputPath);

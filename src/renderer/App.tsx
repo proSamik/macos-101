@@ -45,6 +45,8 @@ const App = () => {
             await window.electronAPI.writeFile(filePath, new Uint8Array(buffer));
             
             // Store the current video path for conversion
+            console.log('Setting currentVideoPath to:', filePath);
+            console.log('New video file name:', file.name);
             setCurrentVideoPath(filePath);
             
             const thumbnailPath = await VideoService.extractFirstFrame(filePath, tempDir);
@@ -102,6 +104,8 @@ const App = () => {
             
             const tempDir = await window.electronAPI.getTempDir();
             const inputPath = currentVideoPath; // Use the stored unique path
+            console.log('Converting video from path:', inputPath);
+            console.log('Selected video name:', selectedVideo?.name);
             const timestamp = Date.now();
             const tempOutputPath = `${tempDir}/converted_${timestamp}.mp4`;
             
