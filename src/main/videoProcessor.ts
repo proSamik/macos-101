@@ -130,8 +130,18 @@ export class VideoProcessor {
         return new Promise(async (resolve, reject) => {
             try {
                 const metadata = await this.getVideoMetadata(inputPath);
-                const [width, height] = this.getResolutionDimensions(settings.resolution);
                 const optimalBitrate = this.calculateOptimalBitrate(settings, metadata.duration);
+                
+                // Maintain original aspect ratio - only scale if needed for size constraints
+                let videoFilter = '';
+                if (settings.maxFileSizeMB < 500) {
+                    // For file size constraints, we may need to reduce resolution
+                    const [maxWidth, maxHeight] = this.getResolutionDimensions(settings.resolution);
+                    videoFilter = `scale='min(${maxWidth},iw)':'min(${maxHeight},ih)':force_original_aspect_ratio=decrease`;
+                } else {
+                    // Maintain original resolution and aspect ratio
+                    videoFilter = 'scale=trunc(iw/2)*2:trunc(ih/2)*2'; // Ensure even dimensions for h264
+                }
                 
                 const outputOptions = [
                     '-c:v libx264',
@@ -140,7 +150,7 @@ export class VideoProcessor {
                     '-c:a aac',
                     '-b:a 128k',
                     '-movflags +faststart',
-                    `-vf scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`
+                    `-vf ${videoFilter}`
                 ];
 
                 let command = ffmpeg(inputPath);
@@ -198,28 +208,36 @@ export class VideoProcessor {
                 
                 const platformSettings = {
                     instagram: {
-                        resolution: '1080:1080',
+                        maxWidth: 1080,
+                        maxHeight: 1920, // Support both square and vertical
                         maxDuration: 60
                     },
                     twitter: {
-                        resolution: '1080:1080',  // Use Instagram settings for better quality
+                        maxWidth: 1080,
+                        maxHeight: 1920, // Support vertical videos
                         maxDuration: 140
                     },
                     youtube: {
-                        resolution: '1920:1080',
+                        maxWidth: 1920,
+                        maxHeight: 1080,
                         maxDuration: 0
                     },
                     facebook: {
-                        resolution: '1280:720',
+                        maxWidth: 1280,
+                        maxHeight: 720,
                         maxDuration: 240
                     },
                     general: {
-                        resolution: `${this.getResolutionDimensions(settings.resolution).join(':')}`,
+                        maxWidth: 1920,
+                        maxHeight: 1080,
                         maxDuration: 0
                     }
                 };
 
                 const platformSetting = platformSettings[settings.platform];
+                
+                // Maintain aspect ratio while respecting platform limits
+                const videoFilter = `scale='min(${platformSetting.maxWidth},iw)':'min(${platformSetting.maxHeight},ih)':force_original_aspect_ratio=decrease`;
                 
                 const outputOptions = [
                     '-c:v libx264',
@@ -228,7 +246,7 @@ export class VideoProcessor {
                     '-c:a aac',
                     '-b:a 128k',
                     '-movflags +faststart',
-                    `-vf scale=${platformSetting.resolution}:force_original_aspect_ratio=decrease,pad=${platformSetting.resolution}:(ow-iw)/2:(oh-ih)/2`
+                    `-vf ${videoFilter}`
                 ];
 
                 let command = ffmpeg(inputPath);

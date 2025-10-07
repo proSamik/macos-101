@@ -63,7 +63,7 @@ const VideoSettings: React.FC<VideoSettingsProps> = ({
     };
 
     const platformSettings = {
-        instagram: { maxBitrate: 3500, resolution: '1080p', description: 'Square format, optimized for IG' },
+        instagram: { maxBitrate: 3500, resolution: '1080p', description: 'High quality, optimized for IG' },
         twitter: { maxBitrate: 2000, resolution: '720p', description: 'Compressed for quick loading' },
         youtube: { maxBitrate: 8000, resolution: '1080p', description: 'High quality for YT standards' },
         facebook: { maxBitrate: 4000, resolution: '720p', description: 'Optimized for FB video posts' },
