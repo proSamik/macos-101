@@ -24,7 +24,6 @@ const App = () => {
     const [savedFilePath, setSavedFilePath] = useState<string>('');
     const [savedFileName, setSavedFileName] = useState<string>('');
     const [convertedFileSize, setConvertedFileSize] = useState<number>(0);
-    const [resetTimer, setResetTimer] = useState<NodeJS.Timeout | null>(null);
 
     const handleVideoSelect = useCallback(async (file: File) => {
         setSelectedVideo(file);
@@ -112,20 +111,6 @@ const App = () => {
             setConvertedVideoPath(finalOutputPath);
             setConversionStatus('completed');
             setShowSuccessModal(true);
-            
-            // Auto-reset after 2 seconds
-            if (resetTimer) {
-                clearTimeout(resetTimer);
-            }
-            const timer = setTimeout(() => {
-                setConversionStatus('idle');
-                setConvertedVideoPath(null);
-                setConversionProgress(null);
-                setShowSuccessModal(false);
-                setSavedFilePath('');
-                setSavedFileName('');
-            }, 2000);
-            setResetTimer(timer);
         } catch (error) {
             console.error('Conversion error:', error);
             setErrorMessage(error instanceof Error ? error.message : 'Conversion failed');
@@ -178,6 +163,16 @@ const App = () => {
             handleCloseModal();
         }
     }, [savedFilePath, handleCloseModal]);
+
+    const handleConvertAgain = useCallback(() => {
+        setConversionStatus('idle');
+        setConvertedVideoPath(null);
+        setConversionProgress(null);
+        setShowSuccessModal(false);
+        setSavedFilePath('');
+        setSavedFileName('');
+        setErrorMessage('');
+    }, []);
 
     const generateOutputFileName = useCallback((settings: VideoSettingsConfig, originalName: string) => {
         const nameWithoutExt = originalName.replace(/\.[^/.]+$/, "");
@@ -250,8 +245,8 @@ const App = () => {
             <Separator /> 
             {selectedVideo || conversionStatus !== 'idle' ? (
                 <div className='flex flex-col h-[calc(100vh-100px)]'>
-                    <div className='flex flex-row items-start justify-center gap-8 w-full flex-1 px-6 py-8 min-w-[1200px] overflow-x-auto'>
-                        <div className="w-full lg:w-1/3 max-w-sm h-[500px]">
+                    <div className='flex flex-row items-start justify-center gap-6 w-full flex-1 px-4 py-8 overflow-x-auto'>
+                        <div className="flex-shrink-0 w-[320px] h-[500px]">
                             <VideoUpload
                                 onVideoSelect={handleVideoSelect}
                                 isProcessing={isProcessing}
@@ -260,19 +255,20 @@ const App = () => {
                             />
                         </div>
                         
-                        <div className="w-full lg:w-1/3 max-w-sm h-[500px]">
+                        <div className="flex-shrink-0 w-[320px] h-[500px]">
                             <VideoProcessor
                                 isProcessing={isProcessing}
                                 progress={conversionProgress}
                                 onStartConversion={handleStartConversion}
                                 onCancelConversion={handleCancelConversion}
+                                onConvertAgain={handleConvertAgain}
                                 selectedVideo={selectedVideo}
                                 conversionStatus={conversionStatus}
                                 errorMessage={errorMessage}
                             />
                         </div>
                         
-                        <div className="w-full lg:w-1/3 max-w-sm h-[500px]">
+                        <div className="flex-shrink-0 w-[320px] h-[500px]">
                             <VideoPreview
                                 convertedVideoPath={convertedVideoPath}
                                 isConverting={conversionStatus === 'processing'}

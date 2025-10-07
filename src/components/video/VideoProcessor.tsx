@@ -10,6 +10,7 @@ interface VideoProcessorProps {
     progress: VideoConversionProgress | null;
     onStartConversion: (settings: VideoSettingsConfig) => void;
     onCancelConversion: () => void;
+    onConvertAgain?: () => void;
     selectedVideo: File | null;
     conversionStatus: 'idle' | 'processing' | 'completed' | 'error';
     errorMessage?: string;
@@ -20,6 +21,7 @@ const VideoProcessor: React.FC<VideoProcessorProps> = ({
     progress,
     onStartConversion,
     onCancelConversion,
+    onConvertAgain,
     selectedVideo,
     conversionStatus,
     errorMessage
@@ -201,15 +203,30 @@ const VideoProcessor: React.FC<VideoProcessorProps> = ({
                         <p className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                             Conversion Complete!
                         </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
                             Your video has been successfully converted to MP4
                         </p>
                         
-                        <div className="flex justify-center">
-                            <VideoSettings
-                                config={videoSettings}
-                                onConfigChange={setVideoSettings}
-                            />
+                        <div className="space-y-3">
+                            <Button
+                                onClick={onConvertAgain}
+                                className="w-full"
+                                style={{
+                                    background: 'linear-gradient(135deg, #153592 0%, #26c9d5 100%)',
+                                    backgroundSize: '200% 200%'
+                                }}
+                            >
+                                <PlayIcon className="w-4 h-4 mr-2" />
+                                Convert Again
+                            </Button>
+                            
+                            <div className="flex justify-center">
+                                <VideoSettings
+                                    config={videoSettings}
+                                    onConfigChange={setVideoSettings}
+                                    onStartConversion={onStartConversion}
+                                />
+                            </div>
                         </div>
                     </div>
                 )}
