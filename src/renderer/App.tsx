@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import SuccessModal from '@/components/ui/success-modal';
@@ -25,6 +25,7 @@ const App = () => {
     const [savedFileName, setSavedFileName] = useState<string>('');
     const [convertedFileSize, setConvertedFileSize] = useState<number>(0);
     const [currentVideoPath, setCurrentVideoPath] = useState<string>('');
+    const currentVideoPathRef = useRef<string>('');
 
     const handleVideoSelect = useCallback(async (file: File) => {
         setSelectedVideo(file);
@@ -49,6 +50,7 @@ const App = () => {
             console.log('Setting currentVideoPath to:', filePath);
             console.log('New video file name:', file.name);
             setCurrentVideoPath(filePath);
+            currentVideoPathRef.current = filePath;
             
             const thumbnailPath = await VideoService.extractFirstFrame(filePath, tempDir);
             const thumbnailUrl = await window.electronAPI.getFileUrl(thumbnailPath);
@@ -107,9 +109,10 @@ const App = () => {
             setConversionProgress(null);
             
             const tempDir = await window.electronAPI.getTempDir();
-            const inputPath = currentVideoPath; // Use the stored unique path
+            const inputPath = currentVideoPathRef.current; // Use the ref for immediate access
             console.log('Converting video from path:', inputPath);
             console.log('Current video path state:', currentVideoPath);
+            console.log('Current video path ref:', currentVideoPathRef.current);
             console.log('Selected video name:', selectedVideo?.name);
             const timestamp = Date.now();
             const tempOutputPath = `${tempDir}/converted_${timestamp}.mp4`;
