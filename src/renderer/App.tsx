@@ -24,6 +24,7 @@ const App = () => {
     const [savedFilePath, setSavedFilePath] = useState<string>('');
     const [savedFileName, setSavedFileName] = useState<string>('');
     const [convertedFileSize, setConvertedFileSize] = useState<number>(0);
+    const [currentVideoPath, setCurrentVideoPath] = useState<string>('');
 
     const handleVideoSelect = useCallback(async (file: File) => {
         setSelectedVideo(file);
@@ -34,15 +35,24 @@ const App = () => {
         
         try {
             const tempDir = await window.electronAPI.getTempDir();
-            const filePath = `${tempDir}/${file.name}`;
+            // Use timestamp to ensure unique filename
+            const timestamp = Date.now();
+            const fileExtension = file.name.split('.').pop() || 'mp4';
+            const uniqueFileName = `video_${timestamp}.${fileExtension}`;
+            const filePath = `${tempDir}/${uniqueFileName}`;
             
             const buffer = await file.arrayBuffer();
             await window.electronAPI.writeFile(filePath, new Uint8Array(buffer));
             
+            // Store the current video path for conversion
+            setCurrentVideoPath(filePath);
+            
             const thumbnailPath = await VideoService.extractFirstFrame(filePath, tempDir);
             const thumbnailUrl = await window.electronAPI.getFileUrl(thumbnailPath);
             if (thumbnailUrl.success && thumbnailUrl.url) {
-                setThumbnailUrl(thumbnailUrl.url);
+                // Add timestamp to prevent caching issues
+                const urlWithTimestamp = `${thumbnailUrl.url}?t=${Date.now()}`;
+                setThumbnailUrl(urlWithTimestamp);
             }
         } catch (error) {
             console.error('Error processing video:', error);
@@ -91,8 +101,9 @@ const App = () => {
             setConversionProgress(null);
             
             const tempDir = await window.electronAPI.getTempDir();
-            const inputPath = `${tempDir}/${selectedVideo.name}`;
-            const tempOutputPath = `${tempDir}/${selectedVideo.name.replace(/\.[^/.]+$/, '')}_converted.mp4`;
+            const inputPath = currentVideoPath; // Use the stored unique path
+            const timestamp = Date.now();
+            const tempOutputPath = `${tempDir}/converted_${timestamp}.mp4`;
             
             const convertedPath = await VideoService.convertToMp4(
                 inputPath,
@@ -172,6 +183,7 @@ const App = () => {
         setSavedFilePath('');
         setSavedFileName('');
         setErrorMessage('');
+        // Keep currentVideoPath so user can convert the same video again
     }, []);
 
     const generateOutputFileName = useCallback((settings: VideoSettingsConfig, originalName: string) => {

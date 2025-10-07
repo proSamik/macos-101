@@ -85,11 +85,11 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
                 {selectedVideo ? (
                     <div className="h-full flex flex-col items-center justify-center">
                         {thumbnailUrl ? (
-                            <div className="relative mb-4 mx-auto max-w-48 max-h-32">
+                            <div className="relative mb-4 mx-auto">
                                 <img 
                                     src={thumbnailUrl} 
                                     alt="Video thumbnail" 
-                                    className="w-auto h-auto max-w-full max-h-full object-contain rounded-lg shadow-md bg-gray-100 dark:bg-gray-800"
+                                    className="max-w-48 max-h-48 w-auto h-auto object-contain rounded-lg shadow-md bg-gray-100 dark:bg-gray-800"
                                 />
                                 <div className="absolute inset-0 flex items-center justify-center">
                                     <div className="bg-black bg-opacity-50 rounded-full p-3">

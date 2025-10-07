@@ -82,11 +82,11 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({
                     <div className="flex-1 flex flex-col">
                         <div className="flex-1 flex flex-col items-center justify-center mb-6">
                             {thumbnailUrl ? (
-                                <div className="relative mb-4 mx-auto max-w-64 max-h-40">
+                                <div className="relative mb-4 mx-auto">
                                     <img 
                                         src={thumbnailUrl} 
                                         alt="Converted video thumbnail" 
-                                        className="w-auto h-auto max-w-full max-h-full object-contain rounded-lg shadow-lg bg-gray-100 dark:bg-gray-800"
+                                        className="max-w-64 max-h-64 w-auto h-auto object-contain rounded-lg shadow-lg bg-gray-100 dark:bg-gray-800"
                                     />
                                     <div className="absolute inset-0 flex items-center justify-center">
                                         <div className="bg-black bg-opacity-50 rounded-full p-4">
@@ -98,7 +98,7 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({
                                     </div>
                                 </div>
                             ) : (
-                                <div className="max-w-64 max-h-40 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                                <div className="w-64 h-40 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center mb-4 mx-auto">
                                     <PlayIcon className="w-16 h-16 text-gray-400" />
                                 </div>
                             )}
