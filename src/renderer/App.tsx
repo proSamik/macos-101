@@ -31,6 +31,7 @@ const App = () => {
         setConversionStatus('idle');
         setThumbnailUrl(null);
         setConvertedVideoPath(null);
+        setCurrentVideoPath(''); // Clear old path immediately
         setIsProcessing(true);
         
         try {
@@ -83,7 +84,10 @@ const App = () => {
     };
 
     const handleStartConversion = useCallback(async (settings: VideoSettingsConfig) => {
-        if (!selectedVideo) return;
+        if (!selectedVideo || !currentVideoPath) {
+            console.error('No video selected or currentVideoPath is empty');
+            return;
+        }
         
         // Ask for save location first
         try {
@@ -105,6 +109,7 @@ const App = () => {
             const tempDir = await window.electronAPI.getTempDir();
             const inputPath = currentVideoPath; // Use the stored unique path
             console.log('Converting video from path:', inputPath);
+            console.log('Current video path state:', currentVideoPath);
             console.log('Selected video name:', selectedVideo?.name);
             const timestamp = Date.now();
             const tempOutputPath = `${tempDir}/converted_${timestamp}.mp4`;
@@ -133,7 +138,7 @@ const App = () => {
         } finally {
             setIsProcessing(false);
         }
-    }, [selectedVideo]);
+    }, [selectedVideo, currentVideoPath]);
 
     const handleCancelConversion = useCallback(() => {
         setConversionStatus('idle');
