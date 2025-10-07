@@ -24,6 +24,7 @@ const App = () => {
     const [savedFilePath, setSavedFilePath] = useState<string>('');
     const [savedFileName, setSavedFileName] = useState<string>('');
     const [convertedFileSize, setConvertedFileSize] = useState<number>(0);
+    const [resetTimer, setResetTimer] = useState<NodeJS.Timeout | null>(null);
 
     const handleVideoSelect = useCallback(async (file: File) => {
         setSelectedVideo(file);
@@ -75,9 +76,8 @@ const App = () => {
         
         // Ask for save location first
         try {
-            const result = await window.electronAPI.showSaveDialog(
-                selectedVideo.name.replace(/\.[^/.]+$/, '') + '_converted.mp4'
-            );
+            const outputFileName = generateOutputFileName(settings, selectedVideo.name);
+            const result = await window.electronAPI.showSaveDialog(outputFileName);
             
             if (result.canceled || !result.filePath) {
                 return; // User canceled save dialog
@@ -112,6 +112,20 @@ const App = () => {
             setConvertedVideoPath(finalOutputPath);
             setConversionStatus('completed');
             setShowSuccessModal(true);
+            
+            // Auto-reset after 2 seconds
+            if (resetTimer) {
+                clearTimeout(resetTimer);
+            }
+            const timer = setTimeout(() => {
+                setConversionStatus('idle');
+                setConvertedVideoPath(null);
+                setConversionProgress(null);
+                setShowSuccessModal(false);
+                setSavedFilePath('');
+                setSavedFileName('');
+            }, 2000);
+            setResetTimer(timer);
         } catch (error) {
             console.error('Conversion error:', error);
             setErrorMessage(error instanceof Error ? error.message : 'Conversion failed');
@@ -165,6 +179,27 @@ const App = () => {
         }
     }, [savedFilePath, handleCloseModal]);
 
+    const generateOutputFileName = useCallback((settings: VideoSettingsConfig, originalName: string) => {
+        const nameWithoutExt = originalName.replace(/\.[^/.]+$/, "");
+        const parts = [nameWithoutExt];
+        
+        // Add quality info
+        if (settings.maxFileSizeMB < 500) {
+            parts.push(`${settings.maxFileSizeMB}MB`);
+        } else if (settings.socialMediaOptimization) {
+            parts.push(settings.platform);
+        } else {
+            parts.push(settings.quality);
+            parts.push(settings.resolution);
+        }
+        
+        // Add preset if not using max file size
+        if (settings.maxFileSizeMB >= 500) {
+            parts.push(settings.preset);
+        }
+        
+        return `${parts.join('_')}.mp4`;
+    }, []);
     
     return (
         <div className="h-screen w-full overflow-hidden">
@@ -215,7 +250,7 @@ const App = () => {
             <Separator /> 
             {selectedVideo || conversionStatus !== 'idle' ? (
                 <div className='flex flex-col h-[calc(100vh-100px)]'>
-                    <div className='flex flex-col lg:flex-row items-start justify-center gap-8 w-full flex-1 px-6 py-8'>
+                    <div className='flex flex-row items-start justify-center gap-8 w-full flex-1 px-6 py-8 min-w-[1200px] overflow-x-auto'>
                         <div className="w-full lg:w-1/3 max-w-sm h-[500px]">
                             <VideoUpload
                                 onVideoSelect={handleVideoSelect}

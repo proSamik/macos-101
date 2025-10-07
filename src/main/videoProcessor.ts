@@ -51,6 +51,12 @@ export class VideoProcessor {
             return settings.bitrate;
         }
 
+        // Fallback to user's bitrate if duration is invalid
+        if (!duration || duration <= 0 || isNaN(duration)) {
+            console.warn('Invalid duration for bitrate calculation, using user bitrate:', duration);
+            return settings.bitrate;
+        }
+
         const targetSizeBytes = settings.maxFileSizeMB * 1024 * 1024;
         const audioBitrate = 128;
         const overhead = 0.1;
@@ -60,7 +66,15 @@ export class VideoProcessor {
             (availableForVideo * 8) / (duration * 1000) - audioBitrate
         );
         
-        return Math.max(500, Math.min(videoBitrate, settings.bitrate));
+        const finalBitrate = Math.max(500, Math.min(videoBitrate, settings.bitrate));
+        
+        // Additional safety check
+        if (isNaN(finalBitrate)) {
+            console.warn('Calculated bitrate is NaN, using user bitrate');
+            return settings.bitrate;
+        }
+        
+        return finalBitrate;
     }
     static async getVideoMetadata(filePath: string): Promise<VideoMetadata> {
         return new Promise((resolve, reject) => {
@@ -188,7 +202,7 @@ export class VideoProcessor {
                         maxDuration: 60
                     },
                     twitter: {
-                        resolution: '1280:720',
+                        resolution: '1080:1080',  // Use Instagram settings for better quality
                         maxDuration: 140
                     },
                     youtube: {
