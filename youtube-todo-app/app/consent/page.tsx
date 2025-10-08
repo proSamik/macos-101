@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSearchParams } from 'next/navigation';
 
-export default function ConsentPage() {
+function ConsentContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const searchParams = useSearchParams();
@@ -130,5 +130,26 @@ export default function ConsentPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Loading...</CardTitle>
+          <CardDescription>Please wait while we load the consent form</CardDescription>
+        </CardHeader>
+      </Card>
+    </div>
+  );
+}
+
+export default function ConsentPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <ConsentContent />
+    </Suspense>
   );
 }
