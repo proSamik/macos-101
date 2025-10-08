@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import SuccessModal from '@/components/ui/success-modal';
@@ -8,7 +8,7 @@ import VideoUpload from '@/components/video/VideoUpload';
 import VideoProcessor from '@/components/video/VideoProcessor';
 import VideoPreview from '@/components/video/VideoPreview';
 import { VideoService } from '@/services/videoService';
-import { VideoConversionProgress, VideoSettingsConfig } from '@/preload/preload';
+import { VideoConversionProgress, VideoSettingsConfig, TokenResponse } from '@/preload/preload';
 import { UploadIcon } from '@radix-ui/react-icons';
 import ogThumbnail from './og-thumbnail.webp';
 
@@ -26,6 +26,96 @@ const App = () => {
     const [convertedFileSize, setConvertedFileSize] = useState<number>(0);
     const [currentVideoPath, setCurrentVideoPath] = useState<string>('');
     const currentVideoPathRef = useRef<string>('');
+    
+    // OIDC Authentication state
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+    const [userInfo, setUserInfo] = useState<any>(null);
+    const [authLoading, setAuthLoading] = useState<boolean>(false);
+    const [authError, setAuthError] = useState<string>('');
+
+    // Setup OIDC authentication event listeners
+    useEffect(() => {
+        const handleAuthSuccess = async (tokens: TokenResponse) => {
+            setAuthLoading(false);
+            setAuthError('');
+            localStorage.setItem('oidc_tokens', JSON.stringify(tokens));
+            setIsAuthenticated(true);
+            
+            // Fetch user info from the OIDC provider
+            try {
+                const response = await fetch('http://localhost:3000/api/auth/oauth2/userinfo', {
+                    headers: {
+                        'Authorization': `Bearer ${tokens.access_token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const userData = await response.json();
+                    setUserInfo(userData);
+                }
+            } catch (error) {
+                // Error fetching user info
+            }
+        };
+
+        const handleAuthError = (error: string) => {
+            setAuthLoading(false);
+            setAuthError(error);
+        };
+
+        // Check for existing tokens on app start
+        const storedTokens = localStorage.getItem('oidc_tokens');
+        if (storedTokens) {
+            try {
+                const tokens = JSON.parse(storedTokens);
+                handleAuthSuccess(tokens);
+            } catch (error) {
+                localStorage.removeItem('oidc_tokens');
+            }
+        }
+
+        // Set up event listeners
+        window.electronAPI.onAuthSuccess(handleAuthSuccess);
+        window.electronAPI.onAuthError(handleAuthError);
+
+        // Cleanup function
+        return () => {
+            // Note: In a real implementation, you'd want to remove these listeners
+            // but the current API doesn't provide a way to do that
+        };
+    }, []);
+
+    const handleLogin = async () => {
+        setAuthLoading(true);
+        setAuthError('');
+        
+        // Set a timeout to reset loading state if auth doesn't complete
+        const timeoutId = setTimeout(() => {
+            setAuthLoading(false);
+            setAuthError('Authentication timed out. Please try again.');
+        }, 60000); // 60 seconds timeout
+        
+        try {
+            const result = await window.electronAPI.startOidcAuth();
+            if (!result.success) {
+                clearTimeout(timeoutId);
+                setAuthLoading(false);
+                setAuthError(result.error || 'Failed to start authentication');
+            }
+            // Keep loading state if successful - will be cleared by auth success/error handlers
+        } catch (error) {
+            clearTimeout(timeoutId);
+            setAuthLoading(false);
+            setAuthError('Failed to initiate login');
+        }
+    };
+
+    const handleLogout = () => {
+        localStorage.removeItem('oidc_tokens');
+        setIsAuthenticated(false);
+        setUserInfo(null);
+        setAuthError('');
+    };
 
     const handleVideoSelect = useCallback(async (file: File) => {
         setSelectedVideo(file);
@@ -47,9 +137,6 @@ const App = () => {
             const buffer = await file.arrayBuffer();
             await window.electronAPI.writeFile(filePath, new Uint8Array(buffer));
             
-            // Store the current video path for conversion
-            console.log('Setting currentVideoPath to:', filePath);
-            console.log('New video file name:', file.name);
             setCurrentVideoPath(filePath);
             currentVideoPathRef.current = filePath;
             
@@ -61,7 +148,7 @@ const App = () => {
                 setThumbnailUrl(urlWithTimestamp);
             }
         } catch (error) {
-            console.error('Error processing video:', error);
+            // Error handling
         } finally {
             setIsProcessing(false);
         }
@@ -82,15 +169,12 @@ const App = () => {
                 await handleVideoSelect(file);
             }
         } catch (error) {
-            console.error('Error uploading video:', error);
+            // Error handling
         }
     };
 
     const handleStartConversion = useCallback(async (settings: VideoSettingsConfig) => {
         if (!selectedVideo || !currentVideoPathRef.current) {
-            console.error('No video selected or currentVideoPath is empty');
-            console.log('currentVideoPath state:', currentVideoPath);
-            console.log('currentVideoPathRef.current:', currentVideoPathRef.current);
             return;
         }
         
@@ -112,11 +196,7 @@ const App = () => {
             setConversionProgress(null);
             
             const tempDir = await window.electronAPI.getTempDir();
-            const inputPath = currentVideoPathRef.current; // Use the ref for immediate access
-            console.log('Converting video from path:', inputPath);
-            console.log('Current video path state:', currentVideoPath);
-            console.log('Current video path ref:', currentVideoPathRef.current);
-            console.log('Selected video name:', selectedVideo?.name);
+            const inputPath = currentVideoPathRef.current;
             const timestamp = Date.now();
             const tempOutputPath = `${tempDir}/converted_${timestamp}.mp4`;
             
@@ -138,7 +218,6 @@ const App = () => {
             setConversionStatus('completed');
             setShowSuccessModal(true);
         } catch (error) {
-            console.error('Conversion error:', error);
             setErrorMessage(error instanceof Error ? error.message : 'Conversion failed');
             setConversionStatus('error');
         } finally {
@@ -167,7 +246,7 @@ const App = () => {
                 setShowSuccessModal(true);
             }
         } catch (error) {
-            console.error('Download error:', error);
+            // Error handling
         }
     }, [convertedVideoPath, selectedVideo]);
 
@@ -263,6 +342,35 @@ const App = () => {
                 </div>
                 
                 <div className='flex gap-2 items-center' style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+                    {/* Authentication Section */}
+                    {isAuthenticated ? (
+                        <div className="flex items-center gap-2">
+                            <div className="text-sm">
+                                <span className="text-muted-foreground">Welcome, </span>
+                                <span className="font-medium">{userInfo?.name || userInfo?.email || 'User'}</span>
+                            </div>
+                            <Button onClick={handleLogout} variant="outline" size="sm">
+                                Logout
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2">
+                            {authError && (
+                                <span className="text-sm text-red-600">{authError}</span>
+                            )}
+                            <Button 
+                                onClick={handleLogin} 
+                                variant="outline" 
+                                size="sm"
+                                disabled={authLoading}
+                            >
+                                {authLoading ? 'Signing in...' : 'Sign In'}
+                            </Button>
+                        </div>
+                    )}
+                    
+                    <Separator orientation="vertical" className="h-6" />
+                    
                     <Button onClick={handleUploadVideo} variant="secondary">
                         <UploadIcon className="w-4 h-4 mr-2" />
                         Upload Video
