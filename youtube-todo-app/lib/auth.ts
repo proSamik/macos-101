@@ -15,7 +15,7 @@ import { user as UserSchema,
 } from "@/lib/db/schema";
 import { usePlunk } from "./useplunk";
 import { EmailService } from "./email-service";
-import { mcp } from "better-auth/plugins";   
+import { mcp, oidcProvider } from "better-auth/plugins";   
 
 // Type for webhook payloads
 type WebhookPayload = {
@@ -196,6 +196,11 @@ export const auth = betterAuth({
     }),
     mcp({
       loginPage: "/sign-in" 
+    }),
+    oidcProvider({
+      loginPage: "/sign-in",
+      consentPage: "/consent",
+      allowDynamicClientRegistration: true
     })
   ]
 });
