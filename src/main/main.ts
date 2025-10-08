@@ -5,7 +5,120 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { VideoProcessor, VideoConversionProgress, VideoSettingsConfig } from './videoProcessor';
 
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+const isDev = !app.isPackaged;
+
+// Set app name for development
+if (isDev) {
+  app.setName('SubclipStarter');
+}
+
+// OIDC Configuration - use localhost for now in all modes
+const SERVER_URL = "http://localhost:3000";
+const REDIRECT_URI = "subclipstarter://auth/callback";
+
+// Register custom protocol for OIDC callback
+const protocolName = "subclipstarter";
+
+// Force app to be single instance and handle protocol registration
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.removeAsDefaultProtocolClient(protocolName);
+  
+  setTimeout(() => {
+    if (process.defaultApp) {
+      if (process.argv.length >= 2) {
+        app.setAsDefaultProtocolClient(protocolName, process.execPath, [path.resolve(process.argv[1])]);
+      }
+    } else {
+      app.setAsDefaultProtocolClient(protocolName);
+    }
+  }, 100);
+}
+
+// Handle protocol callbacks
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+  handleAuthCallback(url);
+});
+
+app.on("second-instance", (_, argv) => {
+  const url = argv.find((arg) => arg.startsWith("subclipstarter://"));
+  if (url) handleAuthCallback(url);
+  mainWindow?.focus();
+});
+
+function handleAuthCallback(url: string) {
+  try {
+    const u = new URL(url);
+    const code = u.searchParams.get("code");
+    const state = u.searchParams.get("state");
+    const error = u.searchParams.get("error");
+    
+    if (error) {
+      mainWindow?.webContents.send("auth-error", error);
+    } else if (code && state) {
+      exchangeCodeForTokens(code);
+    } else {
+      mainWindow?.webContents.send("auth-error", "Invalid authorization response");
+    }
+  } catch (error) {
+    mainWindow?.webContents.send("auth-error", "Failed to parse authorization response");
+  }
+}
+
+async function exchangeCodeForTokens(code: string) {
+  try {
+    const codeVerifier = await mainWindow?.webContents.executeJavaScript(
+      "localStorage.getItem('pkce_verifier')"
+    );
+    const clientId = await mainWindow?.webContents.executeJavaScript(
+      "localStorage.getItem('oidc_client_id')"
+    );
+    const clientSecret = await mainWindow?.webContents.executeJavaScript(
+      "localStorage.getItem('oidc_client_secret')"
+    );
+    
+    const params = new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: clientId,
+      code,
+      redirect_uri: REDIRECT_URI,
+      code_verifier: codeVerifier
+    });
+    
+    if (clientSecret) {
+      params.set("client_secret", clientSecret);
+    }
+    
+    const res = await fetch(`${SERVER_URL}/api/auth/oauth2/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString()
+    });
+    
+    const responseText = await res.text();
+    
+    if (res.ok) {
+      try {
+        const data = JSON.parse(responseText);
+        mainWindow?.webContents.send("auth-success", data);
+      } catch (parseError) {
+        mainWindow?.webContents.send("auth-error", "Invalid token response format");
+      }
+    } else {
+      try {
+        const errorData = JSON.parse(responseText);
+        mainWindow?.webContents.send("auth-error", errorData.error_description || errorData.error || "Token exchange failed");
+      } catch (parseError) {
+        mainWindow?.webContents.send("auth-error", "Token exchange failed with invalid response");
+      }
+    }
+  } catch (error) {
+    mainWindow?.webContents.send("auth-error", "Failed to exchange authorization code");
+  }
+}
 
 class AppUpdater {
   constructor() {
@@ -319,5 +432,82 @@ ipcMain.handle('optimize-for-social-media', async (
     activeConversions.delete(conversionId);
     return { success: false, error: (error as Error).message };
   }
+});
+
+// OIDC Authentication IPC handlers
+ipcMain.handle('start-oidc-auth', async () => {
+  try {
+    const crypto = await import('crypto');
+    
+    function base64URLEncode(str: Buffer): string {
+      return str.toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+    }
+    
+    const codeVerifier = base64URLEncode(crypto.randomBytes(32));
+    const codeChallenge = base64URLEncode(crypto.createHash('sha256').update(codeVerifier).digest());
+    
+    await mainWindow?.webContents.executeJavaScript(`
+      localStorage.setItem('pkce_verifier', '${codeVerifier}');
+    `);
+    
+    const registrationResponse = await fetch(`${SERVER_URL}/api/auth/oauth2/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_name: "SubclipStarter Electron App",
+        redirect_uris: [REDIRECT_URI],
+        token_endpoint_auth_method: "none",
+        grant_types: ["authorization_code", "refresh_token"],
+        response_types: ["code"],
+        application_type: "native",
+        client_type: "public",
+        client_uri: "https://subclip.app",
+        logo_uri: "https://subclip.app/logo.png",
+        scope: "openid profile email",
+        contacts: ["admin@subclip.app"],
+        tos_uri: "https://subclip.app/terms",
+        policy_uri: "https://subclip.app/privacy"
+      })
+    });
+    
+    if (!registrationResponse.ok) {
+      const errorText = await registrationResponse.text();
+      throw new Error(`Client registration failed: ${errorText}`);
+    }
+    
+    const clientData = await registrationResponse.json();
+    const clientId = clientData.client_id;
+    const clientSecret = clientData.client_secret;
+    
+    await mainWindow?.webContents.executeJavaScript(`
+      localStorage.setItem('oidc_client_id', '${clientId}');
+      localStorage.setItem('oidc_client_secret', '${clientSecret}');
+    `);
+    
+    // Build authorization URL
+    const authUrl = new URL(`${SERVER_URL}/api/auth/oauth2/authorize`);
+    authUrl.searchParams.set("response_type", "code");
+    authUrl.searchParams.set("client_id", clientId);
+    authUrl.searchParams.set("redirect_uri", REDIRECT_URI);
+    authUrl.searchParams.set("scope", "openid profile email");
+    authUrl.searchParams.set("code_challenge_method", "S256");
+    authUrl.searchParams.set("code_challenge", codeChallenge);
+    authUrl.searchParams.set("state", crypto.randomBytes(16).toString('hex'));
+    
+    await shell.openExternal(authUrl.toString());
+    
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('test-protocol', async () => {
+  const testUrl = 'subclipstarter://auth/callback?code=test123&state=teststate';
+  handleAuthCallback(testUrl);
+  return { success: true };
 });
 
