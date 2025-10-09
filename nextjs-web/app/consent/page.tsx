@@ -8,7 +8,16 @@ import { useSearchParams } from 'next/navigation';
 function ConsentContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [oauthParams, setOauthParams] = useState<any>(null);
+  const [oauthParams, setOauthParams] = useState<{
+    client_id: string;
+    redirect_uri: string;
+    state: string;
+    response_type: string;
+    scope: string;
+    code_challenge_method: string;
+    code_challenge: string;
+    timestamp: number;
+  } | null>(null);
   const searchParams = useSearchParams();
 
   // Get parameters from URL - these might be null after OAuth redirect
@@ -17,9 +26,7 @@ function ConsentContent() {
   const consent_code = searchParams.get('consent_code');
   
   // These parameters are often lost during OAuth flow
-  let redirect_uri = searchParams.get('redirect_uri');
-  let state = searchParams.get('state');
-  let response_type = searchParams.get('response_type');
+  const redirect_uri = searchParams.get('redirect_uri');
 
   // Retrieve stored OAuth parameters
   useEffect(() => {
@@ -43,7 +50,7 @@ function ConsentContent() {
       console.error('Error parsing stored OAuth params:', e);
       try {
         localStorage.removeItem('oauth_params');
-      } catch (cleanupError) {
+      } catch {
         // Silent fail if localStorage is not available
       }
     }
@@ -84,7 +91,7 @@ function ConsentContent() {
           // Clean up stored parameters after successful consent
           try {
             localStorage.removeItem('oauth_params');
-          } catch (e) {
+          } catch {
             // Silent fail
           }
           
@@ -146,7 +153,7 @@ function ConsentContent() {
             // Clean up stored parameters after successful consent
             try {
               localStorage.removeItem('oauth_params');
-            } catch (e) {
+            } catch {
               // Silent fail
             }
             
@@ -203,7 +210,7 @@ function ConsentContent() {
           // Clean up stored parameters
           try {
             localStorage.removeItem('oauth_params');
-          } catch (e) {
+          } catch {
             // Silent fail
           }
           

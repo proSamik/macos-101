@@ -37,7 +37,7 @@ export default function SignInPage() {
       setTimeout(() => {
         try {
           localStorage.removeItem('oauth_params');
-        } catch (e) {
+        } catch {
           // Silent fail if localStorage is not available
         }
       }, 5 * 60 * 1000);
