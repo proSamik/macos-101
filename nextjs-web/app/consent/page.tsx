@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { useState, Suspense, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSearchParams } from 'next/navigation';
@@ -8,13 +8,46 @@ import { useSearchParams } from 'next/navigation';
 function ConsentContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [oauthParams, setOauthParams] = useState<any>(null);
   const searchParams = useSearchParams();
 
+  // Get parameters from URL - these might be null after OAuth redirect
   const client_id = searchParams.get('client_id');
   const scope = searchParams.get('scope');
-  const redirect_uri = searchParams.get('redirect_uri');
-  const state = searchParams.get('state');
-  const response_type = searchParams.get('response_type');
+  const consent_code = searchParams.get('consent_code');
+  
+  // These parameters are often lost during OAuth flow
+  let redirect_uri = searchParams.get('redirect_uri');
+  let state = searchParams.get('state');
+  let response_type = searchParams.get('response_type');
+
+  // Retrieve stored OAuth parameters
+  useEffect(() => {
+    // Retrieve stored OAuth parameters from localStorage
+    try {
+      const storedParams = localStorage.getItem('oauth_params');
+      if (storedParams) {
+        const params = JSON.parse(storedParams);
+        
+        // Check if parameters are not expired (5 minutes)
+        const isExpired = Date.now() - params.timestamp > 5 * 60 * 1000;
+        
+        if (!isExpired && params.client_id === client_id) {
+          setOauthParams(params);
+        } else {
+          // Clean up expired parameters
+          localStorage.removeItem('oauth_params');
+        }
+      }
+    } catch (e) {
+      console.error('Error parsing stored OAuth params:', e);
+      try {
+        localStorage.removeItem('oauth_params');
+      } catch (cleanupError) {
+        // Silent fail if localStorage is not available
+      }
+    }
+  }, [client_id]);
 
   const scopes = scope?.split(' ') || [];
   const scopeDescriptions: Record<string, string> = {
@@ -28,30 +61,162 @@ function ConsentContent() {
     setError(null);
 
     try {
-      const params = new URLSearchParams({
-        client_id: client_id || '',
-        scope: scope || '',
-        redirect_uri: redirect_uri || '',
-        state: state || '',
-        response_type: response_type || '',
-        consent: granted ? 'allow' : 'deny',
-      });
+      // If we have a consent_code, use the consent endpoint with just that
+      if (consent_code) {
+        console.log('Submitting consent:', { consent_code, accept: granted, client_id, scope });
+        
+        // Try JSON approach with boolean accept value
+        const response = await fetch(`/api/auth/oauth2/consent`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            accept: granted, // boolean, not string
+            consent_code: consent_code
+          }),
+        });
 
-      const response = await fetch(`/api/auth/oauth2/consent?${params.toString()}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Consent successful, response data:', data);
+          
+          // Clean up stored parameters after successful consent
+          try {
+            localStorage.removeItem('oauth_params');
+          } catch (e) {
+            // Silent fail
+          }
+          
+          if (data.redirect_uri || data.redirectURI) {
+            const redirectUrl = data.redirect_uri || data.redirectURI;
+            console.log('Redirecting to:', redirectUrl);
+            window.location.href = redirectUrl;
+          } else {
+            // Build the redirect URL manually with authorization code and state
+            const redirectUri = oauthParams?.redirect_uri || 'subclipstarter://auth/callback';
+            const state = oauthParams?.state;
+            
+            // The authorization code should be in the response data
+            const authCode = data.code || data.authorization_code;
+            
+            if (authCode && state) {
+              const redirectUrl = `${redirectUri}?code=${authCode}&state=${state}`;
+              console.log('Building redirect URL manually:', redirectUrl);
+              window.location.href = redirectUrl;
+            } else if (redirectUri) {
+              // Fallback to stored redirect_uri without parameters (might fail)
+              console.log('Using stored redirect_uri without auth params:', redirectUri);
+              window.location.href = redirectUri;
+            } else {
+              console.log('No redirect_uri found, going to root');
+              window.location.href = '/';
+            }
+          }
+        } else {
+          const responseText = await response.text();
+          console.error('Consent API raw response:', responseText, 'Status:', response.status);
+          
+          let errorData;
+          try {
+            errorData = JSON.parse(responseText);
+          } catch {
+            errorData = { error: responseText || 'Unknown error' };
+          }
+          
+          console.error('Consent API error:', errorData, 'Status:', response.status);
+          
+          // Try fallback without consent_code (cookie-based approach)
+          console.log('Trying cookie-based consent approach...');
+          
+          const fallbackResponse = await fetch(`/api/auth/oauth2/consent`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              accept: granted // only accept parameter
+            }),
+          });
+          
+          if (fallbackResponse.ok) {
+            const fallbackData = await fallbackResponse.json();
+            console.log('Fallback consent successful, response data:', fallbackData);
+            
+            // Clean up stored parameters after successful consent
+            try {
+              localStorage.removeItem('oauth_params');
+            } catch (e) {
+              // Silent fail
+            }
+            
+            if (fallbackData.redirect_uri || fallbackData.redirectURI) {
+              const redirectUrl = fallbackData.redirect_uri || fallbackData.redirectURI;
+              console.log('Fallback redirecting to:', redirectUrl);
+              window.location.href = redirectUrl;
+            } else {
+              // Build the redirect URL manually with authorization code and state
+              const redirectUri = oauthParams?.redirect_uri || 'subclipstarter://auth/callback';
+              const state = oauthParams?.state;
+              
+              // The authorization code should be in the response data
+              const authCode = fallbackData.code || fallbackData.authorization_code;
+              
+              if (authCode && state) {
+                const redirectUrl = `${redirectUri}?code=${authCode}&state=${state}`;
+                console.log('Fallback building redirect URL manually:', redirectUrl);
+                window.location.href = redirectUrl;
+              } else if (redirectUri) {
+                console.log('Fallback using stored redirect_uri without auth params:', redirectUri);
+                window.location.href = redirectUri;
+              } else {
+                console.log('Fallback no redirect_uri found, going to root');
+                window.location.href = '/';
+              }
+            }
+            return; // Exit early on success
+          }
+          
+          setError(errorData.error_description || errorData.error || `HTTP ${response.status}: An error occurred`);
+        }
+      } else if (oauthParams) {
+        // Fallback to full OAuth flow with stored parameters
+        const params = new URLSearchParams();
+        
+        params.append('client_id', oauthParams.client_id);
+        params.append('scope', scope || oauthParams.scope);
+        params.append('redirect_uri', oauthParams.redirect_uri);
+        params.append('state', oauthParams.state);
+        params.append('response_type', oauthParams.response_type);
+        params.append('accept', granted ? 'true' : 'false');
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.redirect_uri) {
-          window.location.href = data.redirect_uri;
+        const response = await fetch(`/api/auth/oauth2/consent?${params.toString()}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Clean up stored parameters
+          try {
+            localStorage.removeItem('oauth_params');
+          } catch (e) {
+            // Silent fail
+          }
+          
+          if (data.redirect_uri) {
+            window.location.href = data.redirect_uri;
+          }
+        } else {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          console.error('Consent API error (fallback):', errorData, 'Status:', response.status);
+          setError(errorData.error_description || errorData.error || `HTTP ${response.status}: An error occurred`);
         }
       } else {
-        const errorData = await response.json();
-        setError(errorData.error_description || 'An error occurred');
+        setError('Missing OAuth parameters. Please try signing in again.');
       }
     } catch (err) {
       setError('Failed to process consent');
@@ -61,13 +226,13 @@ function ConsentContent() {
     }
   };
 
-  if (!client_id) {
+  if (!client_id && !consent_code) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-red-600">Invalid Request</CardTitle>
-            <CardDescription>Missing required parameters</CardDescription>
+            <CardDescription>Missing required parameters (client_id or consent_code)</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -87,7 +252,14 @@ function ConsentContent() {
           <div>
             <h3 className="font-semibold mb-2">Application Details:</h3>
             <p className="text-sm text-gray-600">Client ID: {client_id}</p>
-            <p className="text-sm text-gray-600">Redirect URI: {redirect_uri}</p>
+            {(redirect_uri || oauthParams?.redirect_uri) && (
+              <p className="text-sm text-gray-600">
+                Redirect URI: {redirect_uri || oauthParams?.redirect_uri}
+              </p>
+            )}
+            {consent_code && (
+              <p className="text-sm text-gray-600">Consent Code: {consent_code}</p>
+            )}
           </div>
 
           {scopes.length > 0 && (
