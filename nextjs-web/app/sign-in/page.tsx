@@ -7,11 +7,42 @@ import { Button } from '@/components/ui/button';
 import { signIn, useSession } from '@/lib/auth-client';
 import { LogIn, Target, CheckCircle, Zap } from 'lucide-react';
 import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { data: session } = useSession();
+  const searchParams = useSearchParams();
+
+  // Store OAuth parameters before Google OAuth
+  useEffect(() => {
+    // Store OAuth parameters in localStorage before Google OAuth flow
+    const oauthParams = {
+      response_type: searchParams.get('response_type'),
+      client_id: searchParams.get('client_id'),
+      redirect_uri: searchParams.get('redirect_uri'),
+      scope: searchParams.get('scope'),
+      code_challenge_method: searchParams.get('code_challenge_method'),
+      code_challenge: searchParams.get('code_challenge'),
+      state: searchParams.get('state'),
+      timestamp: Date.now() // For expiration
+    };
+
+    // Only store if we have the main OAuth parameters
+    if (oauthParams.client_id && oauthParams.redirect_uri && oauthParams.state) {
+      localStorage.setItem('oauth_params', JSON.stringify(oauthParams));
+      
+      // Set expiration for 5 minutes
+      setTimeout(() => {
+        try {
+          localStorage.removeItem('oauth_params');
+        } catch (e) {
+          // Silent fail if localStorage is not available
+        }
+      }, 5 * 60 * 1000);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (session) {
