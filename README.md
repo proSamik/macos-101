@@ -1,6 +1,6 @@
 # OIDC Authentication Integration - Code Changes
 
-This document outlines the code changes made to integrate OIDC (OpenID Connect) authentication into the Electron application and Next.js YouTube Todo App.
+This document outlines the code changes made to integrate OIDC (OpenID Connect) authentication into the Electron application and Next.js YouTube Todo App, including fixes for OAuth parameter persistence during the authentication flow.
 
 ## Files Modified
 
@@ -68,29 +68,122 @@ useEffect(() => {
 
 ---
 
-### 2. page.tsx (`youtube-todo-app/app/consent/page.tsx`)
+### 2. Sign-in Page (`nextjs-web/app/sign-in/page.tsx`)
 
-**Purpose**: Fixed React 18+ hydration issues by wrapping useSearchParams in Suspense.
+**Purpose**: Added localStorage-based OAuth parameter persistence to handle parameter loss during Google OAuth redirects.
+
+**Key Changes**:
+
+```tsx
+import { useSearchParams } from 'next/navigation';
+
+export default function SignInPage() {
+  const searchParams = useSearchParams();
+
+  // Store OAuth parameters before Google OAuth
+  useEffect(() => {
+    // Store OAuth parameters in localStorage before Google OAuth flow
+    const oauthParams = {
+      response_type: searchParams.get('response_type'),
+      client_id: searchParams.get('client_id'),
+      redirect_uri: searchParams.get('redirect_uri'),
+      scope: searchParams.get('scope'),
+      code_challenge_method: searchParams.get('code_challenge_method'),
+      code_challenge: searchParams.get('code_challenge'),
+      state: searchParams.get('state'),
+      timestamp: Date.now() // For expiration
+    };
+
+    // Only store if we have the main OAuth parameters
+    if (oauthParams.client_id && oauthParams.redirect_uri && oauthParams.state) {
+      localStorage.setItem('oauth_params', JSON.stringify(oauthParams));
+      
+      // Set expiration for 5 minutes
+      setTimeout(() => {
+        try {
+          localStorage.removeItem('oauth_params');
+        } catch (e) {
+          // Silent fail if localStorage is not available
+        }
+      }, 5 * 60 * 1000);
+    }
+  }, [searchParams]);
+
+  // ... rest of component
+}
+```
+
+**What it does**:
+- Captures OAuth parameters from the URL when the sign-in page loads
+- Stores them in localStorage with a 5-minute expiration timer
+- Ensures parameters survive the Google OAuth redirect process
+- Automatically cleans up expired parameters for security
+
+---
+
+### 3. Consent Page (`nextjs-web/app/consent/page.tsx`)
+
+**Purpose**: Enhanced consent handling with localStorage parameter recovery and proper better-auth API integration.
 
 **Key Changes**:
 
 ```tsx
 function ConsentContent() {
+  const [oauthParams, setOauthParams] = useState<any>(null);
   const searchParams = useSearchParams();
-  // ... existing consent logic
-}
 
-function LoadingFallback() {
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Loading...</CardTitle>
-          <CardDescription>Please wait while we load the consent form</CardDescription>
-        </CardHeader>
-      </Card>
-    </div>
-  );
+  // Retrieve stored OAuth parameters
+  useEffect(() => {
+    try {
+      const storedParams = localStorage.getItem('oauth_params');
+      if (storedParams) {
+        const params = JSON.parse(storedParams);
+        
+        // Check if parameters are not expired (5 minutes)
+        const isExpired = Date.now() - params.timestamp > 5 * 60 * 1000;
+        
+        if (!isExpired && params.client_id === client_id) {
+          setOauthParams(params);
+        } else {
+          localStorage.removeItem('oauth_params');
+        }
+      }
+    } catch (e) {
+      console.error('Error parsing stored OAuth params:', e);
+      localStorage.removeItem('oauth_params');
+    }
+  }, [client_id]);
+
+  const handleConsent = async (granted: boolean) => {
+    try {
+      if (consent_code) {
+        // Use correct better-auth API format
+        const response = await fetch(`/api/auth/oauth2/consent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accept: granted, // boolean, not string
+            consent_code: consent_code
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Clean up stored parameters
+          localStorage.removeItem('oauth_params');
+          
+          // Handle proper redirect with redirectURI (camelCase)
+          if (data.redirect_uri || data.redirectURI) {
+            const redirectUrl = data.redirect_uri || data.redirectURI;
+            window.location.href = redirectUrl; // Contains code & state
+          }
+        }
+      }
+    } catch (error) {
+      // Error handling with detailed logging
+    }
+  };
 }
 
 export default function ConsentPage() {
@@ -103,14 +196,17 @@ export default function ConsentPage() {
 ```
 
 **What it does**:
-- Separates the component that uses `useSearchParams` into its own component
-- Wraps it with React's Suspense boundary to handle SSR/hydration properly
-- Provides a loading fallback while the search params are being resolved
-- Prevents hydration mismatches in Next.js 13+ App Router
+- Retrieves stored OAuth parameters from localStorage after Google OAuth redirect
+- Validates parameter expiration and client_id matching for security
+- Uses correct better-auth API format (`accept: boolean`, not `consent: string`)
+- Handles both `redirect_uri` and `redirectURI` response formats from better-auth
+- Automatically includes authorization code and state in the redirect URL
+- Cleans up localStorage after successful consent
+- Provides Suspense boundary for proper SSR handling
 
 ---
 
-### 3. auth.ts (`youtube-todo-app/lib/auth.ts`)
+### 4. auth.ts (`nextjs-web/lib/auth.ts`)
 
 **Purpose**: Enabled OIDC provider functionality in the Better Auth configuration.
 
@@ -143,7 +239,7 @@ export const auth = betterAuth({
 
 ---
 
-### 4. main.ts (`src/main/main.ts`)
+### 5. main.ts (`src/main/main.ts`)
 
 **Purpose**: Implemented complete OIDC authentication flow in the Electron main process.
 
@@ -233,7 +329,7 @@ ipcMain.handle('start-oidc-auth', async () => {
 
 ---
 
-### 5. preload.ts (`src/preload/preload.ts`)
+### 6. preload.ts (`src/preload/preload.ts`)
 
 **Purpose**: Exposed OIDC authentication APIs to the renderer process.
 
@@ -274,15 +370,38 @@ const electronAPI: ElectronAPI = {
 - Provides event listeners for authentication success/error events
 - Acts as a secure bridge between main and renderer processes
 
+## OAuth Parameter Persistence Solution
+
+A critical issue in the OAuth2 flow was the loss of authorization parameters during Google OAuth redirects. The solution implements a localStorage-based persistence mechanism:
+
+### The Problem
+When users clicked "Continue with Google" on the sign-in page, the OAuth2 parameters (`client_id`, `redirect_uri`, `state`, etc.) were lost during the Google OAuth redirect, causing the consent page to fail with "Invalid authorization response".
+
+### The Solution
+1. **Parameter Capture**: The sign-in page captures all OAuth parameters from the URL and stores them in localStorage before initiating Google OAuth
+2. **Parameter Recovery**: The consent page retrieves the stored parameters after the Google OAuth redirect
+3. **Security**: Parameters are stored with a 5-minute expiration timer and validated against the current client_id
+4. **API Compatibility**: Updated to use the correct better-auth API format (`accept: boolean` instead of `consent: string`)
+5. **Response Handling**: Fixed to handle both `redirect_uri` and `redirectURI` response formats from better-auth
+
+### Flow Diagram
+```
+1. Electron App → Next.js Sign-in Page (with OAuth params)
+2. Sign-in Page → Store params in localStorage → Google OAuth
+3. Google OAuth → Redirect back to Next.js Consent Page
+4. Consent Page → Retrieve params from localStorage → Process consent
+5. Consent Success → Build redirect URL with code & state → Electron App
+```
+
 ## Architecture Overview
 
 The implementation follows the OAuth2/OIDC authorization code flow with PKCE:
 
 1. **Electron App** initiates authentication by registering as a dynamic client
 2. **System Browser** opens for user authentication on the OIDC provider
-3. **OIDC Provider** (Next.js app) handles user login and consent
-4. **Custom Protocol** captures the authorization callback
+3. **OIDC Provider** (Next.js app) handles user login and consent with parameter persistence
+4. **Custom Protocol** captures the authorization callback with proper code and state
 5. **Token Exchange** converts authorization code to access/refresh tokens
 6. **User Info** is fetched and stored for the authenticated session
 
-This approach provides secure authentication while maintaining a good user experience across both the Electron desktop app and the web-based OIDC provider.
+This approach provides secure authentication while maintaining a good user experience across both the Electron desktop app and the web-based OIDC provider, with robust handling of OAuth parameter persistence through the authentication flow.
