@@ -5,24 +5,32 @@
   "main": "dist/main/main.js",
   "homepage": "./",
   "scripts": {
-    "build": "npm run build:renderer && npm run build:main",
-    "build:main": "tsc -p tsconfig.main.json",
-    "build:renderer": "webpack --mode production",
-    "build:production": "NODE_ENV=production npm run build:main && NODE_ENV=production npm run build:renderer",
+    "build-main": "tsc && tsc --project tsconfig.main.json",
+    "build-renderer": "webpack --mode production",
+    "build": "npm run build-main && npm run build-renderer",
+    "build:production": "NODE_ENV=production npm run build-main && NODE_ENV=production npm run build-renderer",
     "start": "electron .",
+    "dev": "npm run build-main && concurrently \"npm run watch-main\" \"npm run dev-renderer\"",
+    "watch-main": "tsc --project tsconfig.main.json --watch",
+    "dev-renderer": "webpack serve --mode development",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "rebuild": "electron-rebuild",
+    "rebuild:win": "electron-rebuild --platform=win32",
+    "rebuild:mac": "electron-rebuild --platform=darwin",
+    "rebuild:linux": "electron-rebuild --platform=linux",
+    "pack": "npm run build:production && NODE_ENV=production electron-builder --dir",
+    "dist": "rm -rf release/* && npm run build:production && NODE_ENV=production electron-builder --mac",
+    "dist:mac": "rm -rf release/* && npm run build:production && npm run rebuild:mac && NODE_ENV=production electron-builder --mac",
+    "dist:win": "rm -rf release/* && npm run build:production && npm run rebuild:win && electron-builder --win",
+    "dist:linux": "rm -rf release/* && npm run build:production && npm run rebuild:linux && electron-builder --linux",
+    "dist:all": "npm run dist:mac && npm run dist:win && npm run dist:linux",
     "version:patch": "npm version patch --no-git-tag-version",
     "version:minor": "npm version minor --no-git-tag-version",
     "version:major": "npm version major --no-git-tag-version",
     "tag:create": "git tag v$(node -p \"require('./package.json').version\")",
     "tag:push": "git push origin v$(node -p \"require('./package.json').version\")",
     "release:prepare": "npm run version:patch && npm run tag:create && npm run tag:push",
-    "release": "rm -rf release/* && npm run build:production && NODE_ENV=production electron-builder --mac --win --linux --publish=always",
-    "upload": "gh release create v$(node -p \"require('./package.json').version\") release/*.dmg \"release/\"*.exe \"release/\"*.AppImage --repo proSamik/subclip-free-tool-thumbnail-releases --title \"Subclip Thumbnail Maker v$(node -p \"require('./package.json').version\")\" --notes \"Release v$(node -p \"require('./package.json').version\")\"",
-    "dist": "npm run build && electron-builder",
-    "dist:all": "npm run build:production && NODE_ENV=production electron-builder --mac --win --linux",
-    "dist:win": "npm run build && electron-builder --win",
-    "dist:mac": "npm run build && electron-builder --mac",
-    "dist:linux": "npm run build && electron-builder --linux"
+    "release": "rm -rf release/* && npm run build:production && NODE_ENV=production electron-builder --mac --publish=always"
   },
   "keywords": [
     "electron",
@@ -45,11 +53,13 @@
     "babel-loader": "^10.0.0",
     "browserify-zlib": "^0.2.0",
     "buffer": "^6.0.3",
+    "concurrently": "^9.2.0",
     "constants-browserify": "^1.0.0",
     "crypto-browserify": "^3.12.1",
     "css-loader": "^7.1.2",
     "electron": "^38.2.1",
     "electron-builder": "^26.0.12",
+    "electron-rebuild": "^3.2.9",
     "events": "^3.3.0",
     "html-webpack-plugin": "^5.6.4",
     "https-browserify": "^1.0.0",
@@ -117,6 +127,11 @@
     "directories": {
       "output": "release"
     },
+    "compression": "maximum",
+    "removePackageScripts": true,
+    "removePackageKeywords": true,
+    "nodeGypRebuild": false,
+    "buildDependenciesFromSource": false,
     "icon": "assets/icon.png",
     "files": [
       "dist/**/*",
@@ -124,13 +139,18 @@
       "!dist/*.dmg",
       "!dist/*.dmg.blockmap",
       "!dist/latest-mac.yml",
-      "package.json"
+      "package.json",
+      ".env"
+    ],
+    "asarUnpack": [
+      "dist/assets/fonts/**/*",
+      ".env"
     ],
     "publish": [
       {
         "provider": "github",
         "owner": "proSamik",
-        "repo": "repo-name",
+        "repo": "macos-101",
         "publishAutoUpdate": true,
         "releaseType": "release"
       }
@@ -139,6 +159,7 @@
     "generateUpdatesFilesForAllChannels": false,
     "mac": {
       "category": "public.app-category.graphics-design",
+      "icon": "assets/icon.png",
       "target": [
         {
           "target": "dmg",
@@ -155,11 +176,21 @@
           ]
         }
       ],
-      "hardenedRuntime": false,
-      "gatekeeperAssess": false
+      "identity": "D7053292F8F66FC7A25AD09700A0C4147357E408",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "gatekeeperAssess": false,
+      "signIgnore": [
+        "node_modules/@electron/",
+        "node_modules/electron/",
+        "node_modules/electron-builder/",
+        "node_modules/electron-updater/"
+      ]
     },
     "dmg": {
-      "title": "Subclip Thumbnail maker",
+      "title": "Subclip Starter Kit",
+      "icon": "assets/icon.png",
       "window": {
         "width": 540,
         "height": 380
@@ -172,7 +203,15 @@
         {
           "target": "nsis",
           "arch": [
-            "x64"
+            "x64",
+            "ia32"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64",
+            "ia32"
           ]
         }
       ],
@@ -183,7 +222,15 @@
         {
           "target": "AppImage",
           "arch": [
-            "x64"
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64",
+            "arm64"
           ]
         }
       ],
