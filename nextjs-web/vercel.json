@@ -1,0 +1,14 @@
+{
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "buildCommand": "pnpm build",
+  "functions": {
+    "app/api/todos/route.ts": {
+      "maxDuration": 10
+    },
+    "app/api/todos/[id]/route.ts": {
+      "maxDuration": 10
+    }
+  }
+}

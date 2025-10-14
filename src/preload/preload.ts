@@ -26,6 +26,13 @@ export interface VideoSettingsConfig {
   maxFileSizeMB: number;
 }
 
+export interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  id_token: string;
+  expires_in: number;
+}
+
 export interface ElectronAPI {
   showOpenDialog: (options?: { filters?: Array<{ name: string; extensions: string[] }> }) => Promise<{ success: boolean; filePath?: string; fileName?: string }>;
   showSaveDialog: (defaultName: string) => Promise<{ canceled: boolean; filePath?: string }>;
@@ -42,6 +49,10 @@ export interface ElectronAPI {
   optimizeForSocialMedia: (inputPath: string, outputPath: string, settings: VideoSettingsConfig, conversionId: string) => Promise<{ success: boolean; convertedPath?: string; error?: string }>;
   onConversionProgress: (callback: (conversionId: string, progress: VideoConversionProgress) => void) => void;
   removeConversionProgressListener: (callback: (conversionId: string, progress: VideoConversionProgress) => void) => void;
+  // OIDC Authentication methods
+  startOidcAuth: () => Promise<{ success: boolean; error?: string }>;
+  onAuthSuccess: (callback: (data: TokenResponse) => void) => void;
+  onAuthError: (callback: (error: string) => void) => void;
 }
 
 const electronAPI: ElectronAPI = {
@@ -63,6 +74,14 @@ const electronAPI: ElectronAPI = {
   },
   removeConversionProgressListener: (callback: (conversionId: string, progress: VideoConversionProgress) => void) => {
     ipcRenderer.removeListener('conversion-progress', callback as any);
+  },
+  // OIDC Authentication implementations
+  startOidcAuth: () => ipcRenderer.invoke('start-oidc-auth'),
+  onAuthSuccess: (callback: (data: TokenResponse) => void) => {
+    ipcRenderer.on('auth-success', (_, data) => callback(data));
+  },
+  onAuthError: (callback: (error: string) => void) => {
+    ipcRenderer.on('auth-error', (_, error) => callback(error));
   },
 };
 
