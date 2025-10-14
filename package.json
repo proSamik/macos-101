@@ -30,7 +30,7 @@
     "tag:create": "git tag v$(node -p \"require('./package.json').version\")",
     "tag:push": "git push origin v$(node -p \"require('./package.json').version\")",
     "release:prepare": "npm run version:patch && npm run tag:create && npm run tag:push",
-    "release": "rm -rf release/* && npm run build:production && NODE_ENV=production electron-builder --mac --publish=always"
+    "release": "rm -rf release/* && npm run build:production && NODE_ENV=production electron-builder --mac --win --linux --publish=always"
   },
   "keywords": [
     "electron",
