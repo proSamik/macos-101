@@ -38,7 +38,10 @@
     "image",
     "editor"
   ],
-  "author": "Subclip",
+  "author": {
+    "name": "Subclip",
+    "email": "support@subclip.app"
+  },
   "license": "MIT",
   "type": "commonjs",
   "devDependencies": {
@@ -234,6 +237,8 @@
           ]
         }
       ],
+      "maintainer": "Subclip <support@subclip.app>",
+      "category": "Graphics",
       "forceCodeSigning": false
     }
   }
