@@ -158,7 +158,8 @@
         "owner": "proSamik",
         "repo": "macos-101",
         "publishAutoUpdate": true,
-        "releaseType": "release"
+        "releaseType": "release",
+        "timeout": 300000
       }
     ],
     "artifactName": "${productName}-${version}-${arch}.${ext}",
