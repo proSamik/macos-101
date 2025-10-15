@@ -1,6 +1,6 @@
 {
   "name": "subclip-starter-kit",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Subclip Starter Kit",
   "main": "dist/main/main.js",
   "homepage": "./",
@@ -24,7 +24,7 @@
     "dist:win": "rm -rf release/* && npm run build:production && npm run rebuild:win && electron-builder --win",
     "dist:linux": "rm -rf release/* && npm run build:production && npm run rebuild:linux && electron-builder --linux",
     "release:mac": "npm run build:production && npm run rebuild:mac && electron-builder --mac --publish=always",
-    "release:win": "npm run build:production && npm run rebuild:win && electron-builder --win --publish=always", 
+    "release:win": "npm run build:production && npm run rebuild:win && electron-builder --win --publish=always",
     "release:linux": "npm run build:production && npm run rebuild:linux && electron-builder --linux --publish=always",
     "dist:all": "npm run dist:mac && npm run dist:win && npm run dist:linux",
     "version:patch": "npm version patch --no-git-tag-version",
