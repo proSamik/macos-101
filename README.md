@@ -1,3 +1,11 @@
+# To create a new release, do this-
+
+```bash
+npm run version:patch && npm run tag:create && npm run tag:push
+npm run release
+```
+
+
 # OIDC Authentication Integration - Code Changes
 
 This document outlines the code changes made to integrate OIDC (OpenID Connect) authentication into the Electron application and Next.js YouTube Todo App, including fixes for OAuth parameter persistence during the authentication flow.
